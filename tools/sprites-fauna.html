@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Folha de sprites — fauna</title>
+  <style>
+    body { background: #16241c; color: #cfe6f5; font: 12px "Trebuchet MS", sans-serif; margin: 0; padding: 6px; }
+    canvas { image-rendering: pixelated; display: block; background: #24402c; border: 1px solid #3f5f45; }
+    .hint { color: #86a892; font: 11px monospace; margin: 2px 0 6px; }
+  </style>
+</head>
+<body>
+  <div class="hint">?only=capy|tapir|deer|peccary|armadillo|coati|jaguar|caiman|toucan|macaw &amp; scale=N</div>
+  <canvas id="sheet"></canvas>
+  <script src="../vendor/phaser.min.js"></script>
+  <script src="../src/core/utils.js"></script>
+  <script src="../src/core/pixel.js"></script>
+  <script src="../src/core/art_props.js"></script>
+  <script src="../src/core/art_entities.js"></script>
+  <script src="../src/data/fauna.js"></script>
+  <script>
+    /*
+     * Folha de revisão de arte. Sem parâmetros desenha todas as espécies em
+     * colunas; com ?only=X desenha um único animal grande, o que cabe no
+     * viewport e permite julgar o pixel a pixel.
+     */
+    var q = new URLSearchParams(location.search);
+    var only = (q.get('only') || '').split(',').filter(function (s) { return s; });
+    var useFrames = (q.get('fr') || '').split(',').filter(function (s) { return s; })
+      .map(function (s) { return parseInt(s, 10); });
+    var SCALE = parseInt(q.get('scale') || (only.length ? 5 : 3), 10);
+    var noFlip = q.get('flip') === '0';
+    var LBL = 22, PAD = 8;
+
+    var kinds = [];
+    for (var k in SV.Fauna) if (SV.Fauna[k] && SV.Fauna[k].draw) kinds.push(k);
+    if (only.length) kinds = kinds.filter(function (kk) { return only.indexOf(kk) >= 0; });
+
+    var rows = kinds.map(function (kind) {
+      var D = SV.Fauna[kind].draw, frames = D.bird ? 3 : 4, imgs = [], x = 0;
+      var list = useFrames.length ? useFrames : [0, 1, 2, 3].slice(0, frames);
+      for (var n = 0; n < list.length; n++) {
+        var f = list[n];
+        if (f >= frames) continue;
+        var a = D.bird ? SV.Art.bird(kind, f, false) : SV.Art.quadruped(kind, f, false);
+        imgs.push([x, a]); x += a.width + 3;
+        if (noFlip) continue;
+        var b = D.bird ? SV.Art.bird(kind, f, true) : SV.Art.quadruped(kind, f, true);
+        imgs.push([x, b]); x += a.width + 6;
+      }
+      return { kind: kind, D: D, w: x, h: Math.max(D.h, 24), imgs: imgs };
+    });
+
+    var W = 0, H = LBL;
+    rows.forEach(function (r) { W = Math.max(W, r.w * SCALE + 8); H += r.h * SCALE + LBL + PAD; });
+
+    var cv = document.getElementById('sheet');
+    cv.width = W; cv.height = H;
+    var c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    var y = LBL;
+    rows.forEach(function (r) {
+      var g = SV.Fauna[r.kind].game;
+      c.fillStyle = '#9fd8b4';
+      c.font = 'bold 14px "Trebuchet MS", sans-serif';
+      c.fillText(r.kind + '  ' + r.D.w + 'x' + r.D.h + '  ' + g.diet + '  hp' + (g.hp || '-') +
+        (g.predator ? '  PREDADOR dano' + g.dmg : ''), 4, y - 8);
+      r.imgs.forEach(function (pair) {
+        c.drawImage(pair[1], 4 + pair[0] * SCALE, y, pair[1].width * SCALE, pair[1].height * SCALE);
+      });
+      y += r.h * SCALE + LBL + PAD;
+    });
+  </script>
+</body>
+</html>
